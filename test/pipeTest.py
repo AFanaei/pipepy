@@ -1,4 +1,8 @@
+import json
+import os
 import unittest
+import numpy as np
+import random
 
 from pipeline.pipe import Pipe, Zcalculator
 
@@ -6,22 +10,19 @@ from pipeline.pipe import Pipe, Zcalculator
 class ZTest(unittest.TestCase):
     def setUp(self):
         self.z = Zcalculator.instance()
-        self.points=[
-            [1, -10, 0.9967102],
-            [115, -10, 0.7071962],
-            [40, 10, 0.9012377],
-            [75, 20, 0.8507508],
-            [65, 30, 0.8822946],
-            [95, 40, 0.863464],
-            [120, 50, 0.8638056],
-        ]
-        self.interp = [
-            [2, 20, 0.9953242],
-            [22, 23, 0.9518844],
-            [33, 17, 0.924142],
-            [42, 18, 0.9063737],
-            [53, 18, 0.8848565],
-        ]
+        address = os.path.join(
+            os.path.dirname(__file__), os.pardir, 'databases', "z.json")
+
+        with open(address) as fp:
+            points = json.load(fp)
+
+        self.points = [random.choice(points) for i in range(20)]
+        self.interp=[]
+        for i in range(20):
+            index = random.randint(0,len(points))
+            if index == len(points):
+                continue
+            self.interp.append([points[index], points[index+1]])
 
     def testZ(self):
         for i in self.points:
@@ -30,8 +31,13 @@ class ZTest(unittest.TestCase):
 
     def testZInterp(self):
         for i in self.interp:
-            res = self.z.get_z(i[0], i[1])
-            self.assertLessEqual(abs(res-i[2]), i[2]*0.001, "diffrence in result")
+            p = [np.average([i[0][j], i[1][j]]) for j in range(3)]
+            res = self.z.get_z(p[0], p[1])
+            # we cant check exactly just check the interpolated value is between the two bounds.
+            # check to make shure calculated z is between the two points.
+            one = i[0][2]-res
+            two = res-i[1][2]
+            self.assertGreater(one*two, 0, "@z:{} @P:{} @T:{} isn`t between {k[0][0]}-{k[1][0]} , {k[0][1]}-{k[1][1]}".format(res, p[0], p[1],k=i))
 
 
 if __name__ == '__main__':
