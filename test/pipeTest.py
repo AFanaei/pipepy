@@ -4,6 +4,8 @@ import unittest
 import numpy as np
 import random
 
+from sympy.physics.units import *
+
 from pipeline.pipe import Pipe, Zcalculator
 
 
@@ -17,17 +19,17 @@ class ZTest(unittest.TestCase):
             points = json.load(fp)
 
         self.points = [random.choice(points) for i in range(20)]
-        self.interp=[]
+        self.interp = []
         for i in range(20):
-            index = random.randint(0,len(points))
+            index = random.randint(0, len(points))
             if index == len(points):
                 continue
-            self.interp.append([points[index], points[index+1]])
+            self.interp.append([points[index], points[index + 1]])
 
     def testZ(self):
         for i in self.points:
             res = self.z.get_z(i[0], i[1])
-            self.assertLessEqual(abs(res-i[2]), i[2]*0.001, "diffrence in result")
+            self.assertLessEqual(abs(res - i[2]), i[2] * 0.001, "diffrence in result")
 
     def testZInterp(self):
         for i in self.interp:
@@ -35,9 +37,22 @@ class ZTest(unittest.TestCase):
             res = self.z.get_z(p[0], p[1])
             # we cant check exactly just check the interpolated value is between the two bounds.
             # check to make shure calculated z is between the two points.
-            one = i[0][2]-res
-            two = res-i[1][2]
-            self.assertGreater(one*two, 0, "@z:{} @P:{} @T:{} isn`t between {k[0][0]}-{k[1][0]} , {k[0][1]}-{k[1][1]}".format(res, p[0], p[1],k=i))
+            one = i[0][2] - res
+            two = res - i[1][2]
+            self.assertGreater(one * two, 0,
+                               "@z:{} @P:{} @T:{} isn`t between {k[0][0]}-{k[1][0]} , {k[0][1]}-{k[1][1]}".format(res,
+                                                                                                                  p[0],
+                                                                                                                  p[1],
+                                                                                                                  k=i))
+
+
+class PipeTest(unittest.TestCase):
+    def setUp(self):
+        self.p = Pipe(num_nodes=8, length=1 * km, teta=0, D=10 * inch, M=16.04, \
+                      inlet={'P': 18 * bar, 'T': 300 * K, 'm': 22.28 * kg / s})
+
+    def testDefinition(self):
+        self.assertIsNotNone(self.p)
 
 
 if __name__ == '__main__':
