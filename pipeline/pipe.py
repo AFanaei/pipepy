@@ -16,7 +16,7 @@ class Zcalculator:
     def __init__(self):
         with open(self.address) as fp:
             points = np.array(json.load(fp))
-        self.tck = interpolate.bisplrep(points[:,0], points[:,1], points[:,2])
+        self.tck = interpolate.bisplrep(points[:, 0], points[:, 1], points[:, 2])
 
     @staticmethod
     def instance():
@@ -24,7 +24,7 @@ class Zcalculator:
             Zcalculator.m_instance = Zcalculator()
         return Zcalculator.m_instance
 
-    def get_z(self,P,T):
+    def get_z(self, P, T):
         return interpolate.bisplev(P, T, self.tck)
 
 
@@ -40,6 +40,7 @@ class Node:
 
     def equations(self, pre, next):
         pass
+
 
 class Pipe:
     def __init__(self, inlet=None, outlet=None, num_nodes=None, teta=None,  ):
