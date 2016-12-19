@@ -2,7 +2,7 @@ import json
 import os
 import numpy as np
 
-from scipy import interpolate, constants, optimize
+from scipy import interpolate, constants, optimize, math, sqrt
 
 
 class InputError(Exception):
@@ -25,7 +25,11 @@ class Zcalculator:
             Zcalculator.m_instance = Zcalculator()
         return Zcalculator.m_instance
 
-    def get_z(self, p, t):
+    def get_z(self, p, t, dp=False, dt=False):
+        if dp:
+            return interpolate.bisplev(float(p), float(t), self.tck, dx=1)
+        if dt:
+            return interpolate.bisplev(float(p), float(t), self.tck, dy=1)
         return interpolate.bisplev(float(p), float(t), self.tck)
 
 
@@ -35,6 +39,7 @@ class Node:
         self.T = 0
         self.m = 0
         self.pipe = pipe
+        self.f_r_old = 0.001
         if state is not None:
             self.P = state['P'].as_two_terms()[0] if 'P' in state else 0
             self.T = state['T'].as_two_terms()[0] if 'T' in state else 0
@@ -50,12 +55,39 @@ class Node:
         return Zcalculator.instance().get_z(self.P / 10 ** 5, self.T - 273.15)
 
     @property
+    def dz_dp(self):
+        # in the given correlation p is in bar gauge and T is in centigrade but in our model every thing is in SI
+        return Zcalculator.instance().get_z(self.P / 10 ** 5, self.T - 273.15, dp=True)
+
+    @property
+    def dz_dt(self):
+        # in the given correlation p is in bar gauge and T is in centigrade but in our model every thing is in SI
+        return Zcalculator.instance().get_z(self.P / 10 ** 5, self.T - 273.15, dt=True)
+
+    @property
+    def v_w(self):
+        return sqrt(self.Z*constants.R*self.T/(1-self.P/self.Z*self.dz_dp-self.P/(self.ro*2220*self.T)*(1+self.T/self.Z*self.dz_dt)**2))
+
+    @property
     def v(self):
         return self.m / (self.ro * self.pipe.A)
 
     @property
     def ro(self):
         return self.P * self.pipe.M / (self.Z * constants.R * self.T)
+
+    @property
+    def f_r(self):
+        def F(x):
+            t = math.log10(self.pipe.epsilon/(3.7*self.pipe.D)+2.51/(self.Re*sqrt(x)))
+            return 1/sqrt(x)+2*t
+        self.f_r_old = optimize.fsolve(F, [self.f_r_old])
+        return float(self.f_r_old)
+
+    @property
+    def Re(self):
+        # TODO: add viscosity from correlation.
+        return self.ro*self.v*self.pipe.D/1.15*10**5
 
     def equations(self, pre_node, next_node):
         dx = 2 * self.pipe.dx
@@ -72,21 +104,27 @@ class Node:
         if hasattr(self, 'is_boundry_p'):
             res[0] = self.is_boundry_p - self.P
         else:
-            res[0] = -self.Z * constants.R * self.T / self.pipe.A * (next_node.m - pre_node.m) / dx
+            res[0] = -self.Z * constants.R * self.T / self.pipe.A / self.pipe.M * (next_node.m - pre_node.m) / dx
         # equation for dm/dt
         if hasattr(self, 'is_boundry_m'):
             res[1] = self.is_boundry_m - self.m
         else:
-            res[1] = -(next_node.m ** 2 * next_node.Z * constants.R * next_node.T / next_node.P / self.pipe.A) / dx \
-                     + (pre_node.m ** 2 * pre_node.Z * constants.R * pre_node.T / pre_node.P / self.pipe.A) / dx \
+            res[1] = - (next_node.m ** 2 * next_node.Z * constants.R * next_node.T / next_node.P / self.pipe.A /self.pipe.M) / dx \
+                     + (pre_node.m ** 2 * pre_node.Z * constants.R * pre_node.T / pre_node.P / self.pipe.A /self.pipe.M) / dx \
                      - self.pipe.A * (next_node.P - pre_node.P) / dx \
-                     - self.pipe.f_r * self.Z * constants.R * self.T / (2 * self.pipe.D * self.pipe.A) * self.m * abs(self.m) / self.P \
-                     - self.pipe.A * self.P * constants.g * np.sin(self.pipe.teta) / (self.Z * constants.R * self.T)
+                     - self.f_r * self.Z * constants.R * self.T / (2 * self.pipe.M * self.pipe.D * self.pipe.A) * self.m * abs(self.m) / self.P \
+                     - self.pipe.M * self.pipe.A * self.P * constants.g * np.sin(self.pipe.teta) / (self.Z * constants.R * self.T)
+        # equation for dT/dt
+        if hasattr(self, 'is_boundry_T'):
+            res[2] = self.is_boundry_T - self.T
+        else:
+            res[2] =
         return res
 
 
 class Pipe:
-    def __init__(self, inlet=None, outlet=None, num_nodes=None, teta=None, length=None, diameter=None, molar_mass=None):
+    def __init__(self, inlet=None, outlet=None, num_nodes=None, teta=None, length=None, diameter=None, molar_mass=None,
+                 epsilon=None):
         self.inlet = inlet
         self.outlet = outlet
         self.num_nodes = num_nodes
@@ -96,16 +134,13 @@ class Pipe:
         self.A = np.pi * self.D ** 2 / 4
         self.teta = teta
         self.M = molar_mass.as_two_terms()[0]
+        self.epsilon = epsilon and epsilon.as_two_terms()[0]
 
         self.nodes = [Node(self) for i in range(0, num_nodes + 2)]
         self.nodes[0] = Node(self, self.inlet)
         self.nodes[-1] = Node(self, self.outlet)
 
         self.is_feasible()
-
-    @property
-    def f_r(self):
-        return 0.855
 
     def is_feasible(self):
         number_equations = self.num_nodes * 3 + 3

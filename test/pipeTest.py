@@ -58,7 +58,7 @@ class PipeTest(unittest.TestCase):
     def setUp(self):
         # use absulute pressure.
         self.p = Pipe(num_nodes=8, length=1 * km, teta=0, diameter=0.254 * m, molar_mass=16.0428 * g / mol,
-                      inlet={'P': 1761580 * pa, 'T': 322.7366 * K, 'm': 22.2816 * kg / s})
+                      inlet={'P': 1761580 * pa, 'T': 322.737 * K, 'm': 22.2816 * kg / s}, epsilon=4.572e-05*m)
         # this test is only for ch4 in case of other components update the test.
         self.propertiesInlet = {'Z': 0.9712604, 'ro': 10.84355, 'v': 40.5526}
         self.propertiesOutlet = {'Z': 0.9805067, 'ro': 7.188548, 'v': 61.1714}
@@ -73,11 +73,10 @@ class PipeTest(unittest.TestCase):
         self.assertIsNotNone(self.p)
 
         self.p.solve_steady_state()
-        print("p:{v.P},t:{v.T},m:{v.m}".format(v=self.p.nodes[-1]))
 
         self.assertAlmostEqual(self.p.nodes[-1].Z, self.propertiesOutlet['Z'], delta=0.001 * self.propertiesOutlet['Z'])
-        self.assertAlmostEqual(self.p.nodes[-1].ro, self.propertiesOutlet['ro'], delta=0.001 * self.propertiesOutlet['ro'])
-        self.assertAlmostEqual(self.p.nodes[-1].v, self.propertiesOutlet['v'], delta=0.001 * self.propertiesOutlet['v'])
+        self.assertAlmostEqual(self.p.nodes[-1].ro, self.propertiesOutlet['ro'], delta=0.01 * self.propertiesOutlet['ro'])
+        self.assertAlmostEqual(self.p.nodes[-1].v, self.propertiesOutlet['v'], delta=0.01 * self.propertiesOutlet['v'])
 
 if __name__ == '__main__':
     unittest.main()
