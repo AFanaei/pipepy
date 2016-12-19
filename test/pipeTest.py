@@ -29,7 +29,7 @@ class ZTest(unittest.TestCase):
         # testing unit conversion in pipe pressure is absulute.
         self.pipeInlet = random.choice(points)
         self.p = Pipe(num_nodes=8, length=1 * km, teta=0, diameter=10 * inch, molar_mass=16.04 * g / mol,
-                      inlet={'P': self.pipeInlet[0] * bar + 1 * atm,
+                      inlet={'P': self.pipeInlet[0] * bar,
                              'T': (self.pipeInlet[1] + 273.15) * K,
                              'm': 22.28 * kg / s})
 
@@ -57,11 +57,16 @@ class ZTest(unittest.TestCase):
 class PipeTest(unittest.TestCase):
     def setUp(self):
         # use absulute pressure.
-        self.p = Pipe(num_nodes=8, length=1 * km, teta=0, diameter=10 * inch, molar_mass=16.04 * g / mol,
-                      inlet={'P': 20 * bar + 1 * atm, 'T': 273.15 * K, 'm': 22.28 * kg / s})
+        self.p = Pipe(num_nodes=8, length=1 * km, teta=0, diameter=0.254 * m, molar_mass=16.0428 * g / mol,
+                      inlet={'P': 1761580 * pa, 'T': 322.7366 * K, 'm': 22.28 * kg / s})
+        # this test is only for ch4 in case of other components update the test.
+        self.properties = {'Z': 0.9712604, 'ro': 10.84355, 'v': 40.5526}
 
     def testDefinition(self):
         self.assertIsNotNone(self.p)
+        self.assertAlmostEqual(self.p.nodes[0].Z, self.properties['Z'], delta=0.001*self.properties['Z'])
+        self.assertAlmostEqual(self.p.nodes[0].ro, self.properties['ro'], delta=0.001*self.properties['ro'])
+        self.assertAlmostEqual(self.p.nodes[0].v, self.properties['v'], delta=0.001 * self.properties['v'])
 
 
 if __name__ == '__main__':

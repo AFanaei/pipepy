@@ -43,7 +43,7 @@ class Node:
     @property
     def Z(self):
         # in the given correlation p is in bar gauge and T is in centigrade but in our model every thing is in SI
-        return Zcalculator.instance().get_z((self.P-101325)/10**5, self.T-273.15)
+        return Zcalculator.instance().get_z((self.P)/10**5, self.T-273.15)
 
     @property
     def v(self):
@@ -51,17 +51,17 @@ class Node:
 
     @property
     def ro(self):
-        return self.P*self.pipe.M/(constants.R*self.T)
+        return self.P*self.pipe.M/(self.Z*constants.R*self.T)
 
-    def equations(self, pre, next):
+    def equations(self, pre_node, next_node):
         dx = 2 * self.pipe.dx
         res = []
         # equation for dp/dt
-        res[0] = -self.Z * constants.R * self.T / self.pipe.A * (next.m - pre.m) / dx
+        res[0] = -self.Z * constants.R * self.T / self.pipe.A * (next_node.m - pre_node.m) / dx
         # equation for dm/dt
-        res[1] = -(next.m ** 2 * next.Z * constants.R * next.T / next.P / self.pipe.A) / dx \
-                 +(pre.m ** 2 * pre.Z * constants.R * pre.T / pre.P / self.pipe.A) / dx \
-                - self.pipe.A*(next.P-pre.P)/dx \
+        res[1] = -(next_node.m ** 2 * next_node.Z * constants.R * next_node.T / next_node.P / self.pipe.A) / dx \
+                 + (pre_node.m ** 2 * pre_node.Z * constants.R * pre_node.T / pre_node.P / self.pipe.A) / dx \
+                - self.pipe.A*(next_node.P - pre_node.P) / dx \
                 - self.pipe.f_r*self.Z*constants.R*self.T/(2*self.pipe.D*self.pipe.A) * self.m*abs(self.m)/self.P \
                 - self.pipe.A*self.P*constants.g*np.sin(self.pipe.teta)/(self.Z*constants.R*self.T)
 
