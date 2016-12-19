@@ -21,10 +21,17 @@ class ZTest(unittest.TestCase):
         self.points = [random.choice(points) for i in range(20)]
         self.interp = []
         for i in range(20):
-            index = random.randint(0, len(points))
-            if index == len(points):
+            index = random.randint(0, len(points) - 1)
+            if index + 1 == len(points):
                 continue
             self.interp.append([points[index], points[index + 1]])
+
+        # testing unit conversion in pipe pressure is absulute.
+        self.pipeInlet = random.choice(points)
+        self.p = Pipe(num_nodes=8, length=1 * km, teta=0, diameter=10 * inch, molar_mass=16.04 * g / mol,
+                      inlet={'P': self.pipeInlet[0] * bar + 1 * atm,
+                             'T': (self.pipeInlet[1] + 273.15) * K,
+                             'm': 22.28 * kg / s})
 
     def testZ(self):
         for i in self.points:
@@ -40,16 +47,18 @@ class ZTest(unittest.TestCase):
             one = i[0][2] - res
             two = res - i[1][2]
             self.assertGreater(one * two, 0,
-                               "@z:{} @P:{} @T:{} isn`t between {k[0][0]}-{k[1][0]} , {k[0][1]}-{k[1][1]}".format(res,
-                                                                                                                  p[0],
-                                                                                                                  p[1],
-                                                                                                                  k=i))
+                    "z:{},P:{},T:{} not between {k[0][0]}-{k[1][0]},{k[0][1]}-{k[1][1]}".format(res, p[0], p[1], k=i))
+
+    def testDefinition(self):
+        self.assertIsNotNone(self.p)
+        self.assertLessEqual(abs(self.p.nodes[0].Z - self.pipeInlet[2]), 0.001 * self.pipeInlet[2])
 
 
 class PipeTest(unittest.TestCase):
     def setUp(self):
-        self.p = Pipe(num_nodes=8, length=1 * km, teta=0, D=10 * inch, M=16.04, \
-                      inlet={'P': 18 * bar, 'T': 300 * K, 'm': 22.28 * kg / s})
+        # use absulute pressure.
+        self.p = Pipe(num_nodes=8, length=1 * km, teta=0, diameter=10 * inch, molar_mass=16.04 * g / mol,
+                      inlet={'P': 20 * bar + 1 * atm, 'T': 273.15 * K, 'm': 22.28 * kg / s})
 
     def testDefinition(self):
         self.assertIsNotNone(self.p)

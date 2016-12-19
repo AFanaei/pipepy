@@ -26,7 +26,7 @@ class Zcalculator:
         return Zcalculator.m_instance
 
     def get_z(self, P, T):
-        return interpolate.bisplev(P, T, self.tck)
+        return interpolate.bisplev(float(P), float(T), self.tck)
 
 
 class Node:
@@ -36,13 +36,14 @@ class Node:
         self.m = 0
         self.pipe = pipe
         if state is not None:
-            self.P = state['P']
-            self.T = state['T']
-            self.m = state['m']
+            self.P = state['P'].as_two_terms()[0]
+            self.T = state['T'].as_two_terms()[0]
+            self.m = state['m'].as_two_terms()[0]
 
     @property
     def Z(self):
-        return Zcalculator.instance().get_z(self.P, self.T)
+        # in the given correlation p is in bar gauge and T is in centigrade but in our model every thing is in SI
+        return Zcalculator.instance().get_z((self.P-101325)/10**5, self.T-273.15)
 
     @property
     def v(self):
@@ -66,16 +67,16 @@ class Node:
 
 
 class Pipe:
-    def __init__(self, inlet=None, outlet=None, num_nodes=None, teta=None, length=None, D=None, M=None):
+    def __init__(self, inlet=None, outlet=None, num_nodes=None, teta=None, length=None, diameter=None, molar_mass=None):
         self.inlet = inlet
         self.outlet = outlet
         self.num_nodes = num_nodes
-        self.length = length
+        self.length = length.as_two_terms()[0]
         self.dx = length / (num_nodes + 1)
-        self.A = np.pi*D**2/4
-        self.D = D
+        self.D = diameter.as_two_terms()[0]
+        self.A = np.pi*self.D**2/4
         self.teta = teta
-        self.M = M
+        self.M = molar_mass.as_two_terms()[0]
 
         self.nodes = [Node(self) for i in range(0, num_nodes + 2)]
         self.nodes[0] = Node(self, self.inlet)
@@ -99,6 +100,5 @@ class Pipe:
             number_vars += 0 if self.outlet['T'] is None else 1
             number_vars += 0 if self.outlet['m'] is None else 1
 
-        print("v:{},e:{}".format(number_vars,number_equations))
         if number_vars!=number_equations:
             raise InputError("Bad input")
