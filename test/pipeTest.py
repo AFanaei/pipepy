@@ -54,7 +54,7 @@ class ZTest(unittest.TestCase):
         self.assertLessEqual(abs(self.p.nodes[0].Z - self.pipeInlet[2]), 0.001 * self.pipeInlet[2])
 
 
-class PipeTest(unittest.TestCase):
+class PipeIsothermTest(unittest.TestCase):
     def setUp(self):
         # use absulute pressure.
         self.p = Pipe(num_nodes=8, length=1 * km, teta=0, diameter=0.254 * m, molar_mass=16.0428 * g / mol,
@@ -77,6 +77,31 @@ class PipeTest(unittest.TestCase):
         self.assertAlmostEqual(self.p.nodes[-1].Z, self.propertiesOutlet['Z'], delta=0.001 * self.propertiesOutlet['Z'])
         self.assertAlmostEqual(self.p.nodes[-1].ro, self.propertiesOutlet['ro'], delta=0.01 * self.propertiesOutlet['ro'])
         self.assertAlmostEqual(self.p.nodes[-1].v, self.propertiesOutlet['v'], delta=0.01 * self.propertiesOutlet['v'])
+
+
+# class PipeTest(unittest.TestCase):
+#     def setUp(self):
+#         # use absulute pressure.
+#         self.p = Pipe(num_nodes=8, length=1 * km, teta=0, diameter=0.254 * m, molar_mass=16.0428 * g / mol,
+#                       inlet={'P': 1761580 * pa, 'T': 322.737 * K, 'm': 22.2816 * kg / s}, epsilon=4.572e-05*m)
+#         # this test is only for ch4 in case of other components update the test.
+#         self.propertiesInlet = {'Z': 0.9712604, 'ro': 10.84355, 'v': 40.5526}
+#         self.propertiesOutlet = {'Z': 0.9805067, 'ro': 7.188548, 'v': 61.1714}
+#
+#     def testDefinition(self):
+#         self.assertIsNotNone(self.p)
+#         self.assertAlmostEqual(self.p.nodes[0].Z, self.propertiesInlet['Z'], delta=0.001 * self.propertiesInlet['Z'])
+#         self.assertAlmostEqual(self.p.nodes[0].ro, self.propertiesInlet['ro'], delta=0.001 * self.propertiesInlet['ro'])
+#         self.assertAlmostEqual(self.p.nodes[0].v, self.propertiesInlet['v'], delta=0.001 * self.propertiesInlet['v'])
+#
+#     def testSolve(self):
+#         self.assertIsNotNone(self.p)
+#
+#         self.p.solve_steady_state()
+#
+#         self.assertAlmostEqual(self.p.nodes[-1].Z, self.propertiesOutlet['Z'], delta=0.001 * self.propertiesOutlet['Z'])
+#         self.assertAlmostEqual(self.p.nodes[-1].ro, self.propertiesOutlet['ro'], delta=0.01 * self.propertiesOutlet['ro'])
+#         self.assertAlmostEqual(self.p.nodes[-1].v, self.propertiesOutlet['v'], delta=0.01 * self.propertiesOutlet['v'])
 
 if __name__ == '__main__':
     unittest.main()

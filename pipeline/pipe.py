@@ -27,10 +27,10 @@ class Zcalculator:
 
     def get_z(self, p, t, dp=False, dt=False):
         if dp:
-            return interpolate.bisplev(float(p), float(t), self.tck, dx=1)
+            return interpolate.bisplev(np.array(float(p)), np.array(float(t)), self.tck, dx=1)
         if dt:
-            return interpolate.bisplev(float(p), float(t), self.tck, dy=1)
-        return interpolate.bisplev(float(p), float(t), self.tck)
+            return interpolate.bisplev(np.array(float(p)), np.array(float(t)), self.tck, dy=1)
+        return interpolate.bisplev(np.array(float(p)), np.array(float(t)), self.tck)
 
 
 class Node:
@@ -66,7 +66,21 @@ class Node:
 
     @property
     def v_w(self):
-        return sqrt(self.Z*constants.R*self.T/(1-self.P/self.Z*self.dz_dp-self.P/(self.ro*2220*self.T)*(1+self.T/self.Z*self.dz_dt)**2))
+        return sqrt(self.Z*constants.R*self.T
+                    / (1-self.P/self.Z*self.dz_dp-self.P/(self.ro*self.c_p*self.T)*(1+self.T/self.Z*self.dz_dt)**2))
+
+    @property
+    def c_p(self):
+        # TODO: add specific heat from correlation.
+        return 2200
+
+    @property
+    def omega(self):
+        return self.pipe.U*(math.pi*self.pipe.D)*(self.T-self.pipe.ambient_T)
+
+    @property
+    def tav_w(self):
+        return self.f_r*self.ro*self.v*abs(self.v)/8
 
     @property
     def v(self):
@@ -78,16 +92,21 @@ class Node:
 
     @property
     def f_r(self):
-        def F(x):
+        def func(x):
             t = math.log10(self.pipe.epsilon/(3.7*self.pipe.D)+2.51/(self.Re*sqrt(x)))
             return 1/sqrt(x)+2*t
-        self.f_r_old = optimize.fsolve(F, [self.f_r_old])
+        self.f_r_old = optimize.fsolve(func, np.array(self.f_r_old))
         return float(self.f_r_old)
 
     @property
     def Re(self):
         # TODO: add viscosity from correlation.
         return self.ro*self.v*self.pipe.D/1.15*10**5
+
+    def num_equations(self):
+        if self.pipe.isotherm:
+            return 2
+        return 3
 
     def equations(self, pre_node, next_node):
         dx = 2 * self.pipe.dx
@@ -109,22 +128,28 @@ class Node:
         if hasattr(self, 'is_boundry_m'):
             res[1] = self.is_boundry_m - self.m
         else:
-            res[1] = - (next_node.m ** 2 * next_node.Z * constants.R * next_node.T / next_node.P / self.pipe.A /self.pipe.M) / dx \
-                     + (pre_node.m ** 2 * pre_node.Z * constants.R * pre_node.T / pre_node.P / self.pipe.A /self.pipe.M) / dx \
-                     - self.pipe.A * (next_node.P - pre_node.P) / dx \
-                     - self.f_r * self.Z * constants.R * self.T / (2 * self.pipe.M * self.pipe.D * self.pipe.A) * self.m * abs(self.m) / self.P \
-                     - self.pipe.M * self.pipe.A * self.P * constants.g * np.sin(self.pipe.teta) / (self.Z * constants.R * self.T)
+            res[1] = - (next_node.m**2*next_node.Z*constants.R*next_node.T/next_node.P/self.pipe.A/self.pipe.M)/dx \
+                     + (pre_node.m**2*pre_node.Z*constants.R*pre_node.T/pre_node.P/self.pipe.A/self.pipe.M)/dx \
+                     - self.pipe.A*(next_node.P-pre_node.P)/dx \
+                     - self.f_r*self.Z*constants.R*self.T/(2*self.pipe.M*self.pipe.D*self.pipe.A)*self.m*abs(self.m)/self.P \
+                     - self.pipe.M*self.pipe.A*self.P*constants.g*np.sin(self.pipe.teta)/(self.Z*constants.R*self.T)
         # equation for dT/dt
+        if self.pipe.isotherm:
+            return res
+
         if hasattr(self, 'is_boundry_T'):
             res[2] = self.is_boundry_T - self.T
         else:
-            res[2] =
+            res[2] = + self.v*(next_node.T-pre_node.T)/dx \
+                     + self.v_w**2/self.c_p*(1+self.T/self.Z*self.dz_dt)*(next_node.v-pre_node.v)/dx \
+                     - self.v_w**2/(self.c_p*self.P)*(1-self.P/self.Z*self.dz_dp) \
+                     * (self.omega+self.tav_w*math.pi*self.pipe.D*self.v)/self.pipe.A
         return res
 
 
 class Pipe:
     def __init__(self, inlet=None, outlet=None, num_nodes=None, teta=None, length=None, diameter=None, molar_mass=None,
-                 epsilon=None):
+                 epsilon=None, ambient_t=None, isotherm=True, heat_transfer_coef=None, ):
         self.inlet = inlet
         self.outlet = outlet
         self.num_nodes = num_nodes
@@ -135,6 +160,9 @@ class Pipe:
         self.teta = teta
         self.M = molar_mass.as_two_terms()[0]
         self.epsilon = epsilon and epsilon.as_two_terms()[0]
+        self.isotherm = isotherm
+        self.ambient_T = ambient_t and ambient_t.as_two_terms()[0]
+        self.U = heat_transfer_coef and heat_transfer_coef.as_two_terms()[0]
 
         self.nodes = [Node(self) for i in range(0, num_nodes + 2)]
         self.nodes[0] = Node(self, self.inlet)
@@ -143,21 +171,35 @@ class Pipe:
         self.is_feasible()
 
     def is_feasible(self):
-        number_equations = self.num_nodes * 3 + 3
-        number_vars = self.num_nodes * 3
+        if not self.isotherm and (self.ambient_T is None or self.U is None):
+            raise InputError("pipe is not isotherm and ambient T or U does not specified.")
+
+        number_equations = (self.num_nodes+1) * self.nodes[0].num_equations()
+        number_vars = self.num_nodes * self.nodes[0].num_equations()
         if self.inlet is not None:
             number_vars += 0 if self.inlet['P'] is None else 1
-            number_vars += 0 if self.inlet['T'] is None else 1
             number_vars += 0 if self.inlet['m'] is None else 1
+            number_vars += 1 if self.inlet['T'] is not None and not self.isotherm else 0
         if self.outlet is not None:
             number_vars += 0 if self.outlet['P'] is None else 1
-            number_vars += 0 if self.outlet['T'] is None else 1
             number_vars += 0 if self.outlet['m'] is None else 1
+            number_vars += 1 if self.outlet['T'] is not None and not self.isotherm else 0
 
         if number_vars != number_equations:
-            raise InputError("Bad input")
+            raise InputError("number of equations {} != variables {}.".format(number_equations,number_vars))
 
     def solve_steady_state(self):
+        p, t, m = self._initialize_by_boundry()
+        x = [float(p)] * (self.num_nodes + 2) + [float(m)] * (self.num_nodes + 2)
+        if not self.isotherm:
+            x += [float(t)] * (self.num_nodes + 2)
+        x = optimize.fsolve(self._system_equations, x)
+
+        for i, (p, m) in enumerate(zip(x[:len(x) // 2], x[len(x) // 2:])):
+            self.nodes[i].P = p
+            self.nodes[i].m = m
+
+    def _initialize_by_boundry(self):
         if self.inlet is not None and 'P' in self.inlet:
             p = self.inlet['P'].as_two_terms()[0]
         else:
@@ -168,20 +210,30 @@ class Pipe:
         else:
             m = self.outlet['m'].as_two_terms()[0]
 
-        x = [float(p)] * (self.num_nodes + 2) + [float(m)] * (self.num_nodes + 2)
-        x = optimize.fsolve(self._system_equations, x)
+        if self.inlet is not None and 'T' in self.inlet:
+            t = self.inlet['T'].as_two_terms()[0]
+        else:
+            t = self.outlet['T'].as_two_terms()[0]
 
-        for i, (p, m) in enumerate(zip(x[:len(x) // 2], x[len(x) // 2:])):
-            self.nodes[i].P = p
-            self.nodes[i].m = m
-            self.nodes[i].T = 322.7366
+        for node in self.nodes:
+            node.P = p
+            node.T = t
+            node.m = m
+
+        return p, t, m
 
     def _system_equations(self, x):
         y = []
-        for i, (p, m) in enumerate(zip(x[:len(x) // 2], x[len(x) // 2:])):
-            self.nodes[i].P = p
-            self.nodes[i].m = m
-            self.nodes[i].T = 322.7366
+        len_x = len(x)
+        d = len_x//len(self.nodes)
+        l = [x[i*len_x//d:(i+1)*len_x//d] for i in range(d)]
+        for i, tup in enumerate(zip(*l)):
+            self.nodes[i].P = tup[0]
+            self.nodes[i].m = tup[1]
+            try:
+                self.nodes[i].T = tup[2]
+            except IndexError:
+                pass
 
         for i in range(len(x) // 2):
             try:
