@@ -2,7 +2,7 @@ import json
 import os
 import numpy as np
 
-from scipy import interpolate, constants, optimize, math, sqrt
+from scipy import interpolate, constants, optimize, math
 
 
 class InputError(Exception):
@@ -57,7 +57,7 @@ class Node:
     @property
     def dz_dp(self):
         # in the given correlation p is in bar gauge and T is in centigrade but in our model every thing is in SI
-        return Zcalculator.instance().get_z(self.P / 10 ** 5, self.T - 273.15, dp=True)
+        return Zcalculator.instance().get_z(self.P / 10 ** 5, self.T - 273.15, dp=True)/10**5
 
     @property
     def dz_dt(self):
@@ -66,17 +66,17 @@ class Node:
 
     @property
     def v_w(self):
-        return sqrt(self.Z*constants.R*self.T
-                    / (1-self.P/self.Z*self.dz_dp-self.P/(self.ro*self.c_p*self.T)*(1+self.T/self.Z*self.dz_dt)**2))
+        return math.sqrt(self.Z*constants.R*self.T /
+                    (1-self.P/self.Z*self.dz_dp-self.P/(self.ro*self.c_p*self.T)*(1+self.T/self.Z*self.dz_dt)**2))
 
     @property
     def c_p(self):
         # TODO: add specific heat from correlation.
-        return 2200
+        return 2314
 
     @property
     def omega(self):
-        return self.pipe.U*(math.pi*self.pipe.D)*(self.T-self.pipe.ambient_T)
+        return self.pipe.U*(math.pi*self.pipe.D)*(self.pipe.ambient_T-self.T)
 
     @property
     def tav_w(self):
@@ -93,8 +93,8 @@ class Node:
     @property
     def f_r(self):
         def func(x):
-            t = math.log10(self.pipe.epsilon/(3.7*self.pipe.D)+2.51/(self.Re*sqrt(x)))
-            return 1/sqrt(x)+2*t
+            t = math.log10(self.pipe.epsilon/(3.7*self.pipe.D)+2.51/(self.Re*math.sqrt(x)))
+            return 1/math.sqrt(x)+2*t
         self.f_r_old = optimize.fsolve(func, np.array(self.f_r_old))
         return float(self.f_r_old)
 
@@ -138,12 +138,12 @@ class Node:
             return res
 
         if hasattr(self, 'is_boundry_T'):
-            res[2] = self.is_boundry_T - self.T
+            res.append(self.is_boundry_T - self.T)
         else:
-            res[2] = + self.v*(next_node.T-pre_node.T)/dx \
-                     + self.v_w**2/self.c_p*(1+self.T/self.Z*self.dz_dt)*(next_node.v-pre_node.v)/dx \
-                     - self.v_w**2/(self.c_p*self.P)*(1-self.P/self.Z*self.dz_dp) \
-                     * (self.omega+self.tav_w*math.pi*self.pipe.D*self.v)/self.pipe.A
+            res.append(+ self.v*(next_node.T-pre_node.T)/dx
+                       + self.v_w**2/self.c_p*(1+self.T/self.Z*self.dz_dt)*(next_node.v-pre_node.v)/dx
+                       - self.v_w**2/(self.c_p*self.P)*(1-self.P/self.Z*self.dz_dp)
+                       * (self.omega+self.tav_w*math.pi*self.pipe.D*self.v)/self.pipe.A)
         return res
 
 
@@ -195,9 +195,11 @@ class Pipe:
             x += [float(t)] * (self.num_nodes + 2)
         x = optimize.fsolve(self._system_equations, x)
 
-        for i, (p, m) in enumerate(zip(x[:len(x) // 2], x[len(x) // 2:])):
-            self.nodes[i].P = p
-            self.nodes[i].m = m
+        print(x)
+
+        # for i, (p, m) in enumerate(zip(x[:len(x) // 2], x[len(x) // 2:])):
+        #     self.nodes[i].P = p
+        #     self.nodes[i].m = m
 
     def _initialize_by_boundry(self):
         if self.inlet is not None and 'P' in self.inlet:
@@ -217,8 +219,8 @@ class Pipe:
 
         for node in self.nodes:
             node.P = p
-            node.T = t
             node.m = m
+            node.T = t
 
         return p, t, m
 
@@ -235,7 +237,7 @@ class Pipe:
             except IndexError:
                 pass
 
-        for i in range(len(x) // 2):
+        for i,_ in enumerate(self.nodes):
             try:
                 pre_node = self.nodes[i - 1]
             except IndexError:
