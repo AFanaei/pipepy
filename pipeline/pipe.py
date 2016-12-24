@@ -66,7 +66,7 @@ class Node:
 
     @property
     def v_w(self):
-        return math.sqrt(self.Z*constants.R*self.T /
+        return math.sqrt(self.Z*constants.R*self.T/self.pipe.M /
                     (1-self.P/self.Z*self.dz_dp-self.P/(self.ro*self.c_p*self.T)*(1+self.T/self.Z*self.dz_dt)**2))
 
     @property
@@ -194,8 +194,6 @@ class Pipe:
         if not self.isotherm:
             x += [float(t)] * (self.num_nodes + 2)
         x = optimize.fsolve(self._system_equations, x)
-
-        print(x)
 
         # for i, (p, m) in enumerate(zip(x[:len(x) // 2], x[len(x) // 2:])):
         #     self.nodes[i].P = p
