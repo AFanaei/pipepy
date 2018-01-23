@@ -4,12 +4,13 @@ import unittest
 import random
 from sympy.physics import units as U
 
-from equipment.pipe import Pipe, Zcalculator
+from equipment.pipe import Pipe
+from property_set.comp_factor import CompFactorInterpolator
 
 
 class PipeDefinitionTest(unittest.TestCase):
     def setUp(self):
-        self.z = Zcalculator.instance()
+        self.z = CompFactorInterpolator()
         address = os.path.join(
             os.path.dirname(__file__), os.pardir, 'databases', "z.json")
 

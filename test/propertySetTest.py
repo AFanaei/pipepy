@@ -5,12 +5,12 @@ import unittest
 
 import numpy as np
 
-from equipment.pipe import Zcalculator
+from property_set.comp_factor import CompFactorInterpolator
 
 
 class ZTest(unittest.TestCase):
     def setUp(self):
-        self.z = Zcalculator.instance()
+        self.z = CompFactorInterpolator()
         address = os.path.join(
             os.path.dirname(__file__), os.pardir, 'databases', "z.json")
 

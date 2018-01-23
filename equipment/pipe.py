@@ -1,42 +1,19 @@
-import json
-import os
 import numpy as np
 
-from scipy import interpolate, constants, optimize, math
+from scipy import constants, optimize, math
 from sympy.physics import units as U
 from sympy.physics.units import convert_to
+
+from property_set.comp_factor import CompFactorInterpolator
 
 
 class InputError(Exception):
     pass
 
 
-class Zcalculator:
-    m_instance = None
-    address = os.path.join(
-        os.path.dirname(__file__), os.pardir, 'databases', "z.json")
-
-    def __init__(self):
-        with open(self.address) as fp:
-            points = np.array(json.load(fp))
-        self.tck = interpolate.bisplrep(points[:, 0], points[:, 1], points[:, 2])
-
-    @staticmethod
-    def instance():
-        if Zcalculator.m_instance is None:
-            Zcalculator.m_instance = Zcalculator()
-        return Zcalculator.m_instance
-
-    def get_z(self, p, t, dp=False, dt=False):
-        if dp:
-            return interpolate.bisplev(np.array(float(p)), np.array(float(t)), self.tck, dx=1)
-        if dt:
-            return interpolate.bisplev(np.array(float(p)), np.array(float(t)), self.tck, dy=1)
-        return interpolate.bisplev(np.array(float(p)), np.array(float(t)), self.tck)
-
-
 class Node:
     def __init__(self, pipe=None, state=None):
+        self.Zcalculator = CompFactorInterpolator()
         self.P = 0
         self.T = 0
         self.m = 0
@@ -54,17 +31,17 @@ class Node:
     @property
     def Z(self):
         # in the given correlation p is in bar gauge and T is in centigrade but in our model every thing is in SI
-        return Zcalculator.instance().get_z(self.P / 10 ** 5, self.T - 273.15)
+        return self.Zcalculator.get_z(self.P / 10 ** 5, self.T - 273.15)
 
     @property
     def dz_dp(self):
         # in the given correlation p is in bar gauge and T is in centigrade but in our model every thing is in SI
-        return Zcalculator.instance().get_z(self.P / 10 ** 5, self.T - 273.15, dp=True) / 10**5
+        return self.Zcalculator.get_z(self.P / 10 ** 5, self.T - 273.15, dp=True) / 10**5
 
     @property
     def dz_dt(self):
         # in the given correlation p is in bar gauge and T is in centigrade but in our model every thing is in SI
-        return Zcalculator.instance().get_z(self.P / 10 ** 5, self.T - 273.15, dt=True)
+        return self.Zcalculator.get_z(self.P / 10 ** 5, self.T - 273.15, dt=True)
 
     @property
     def v_w(self):
