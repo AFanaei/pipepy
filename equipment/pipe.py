@@ -3,6 +3,8 @@ import os
 import numpy as np
 
 from scipy import interpolate, constants, optimize, math
+from sympy.physics import units as U
+from sympy.physics.units import convert_to
 
 
 class InputError(Exception):
@@ -41,13 +43,13 @@ class Node:
         self.pipe = pipe
         self.f_r_old = 0.001
         if state is not None:
-            self.P = state['P'].args[0] if 'P' in state else 0
-            self.T = state['T'].args[0] if 'T' in state else 0
-            self.m = state['m'].args[0] if 'm' in state else 0
+            self.P = convert_to(state['P'], U.pa).args[0] if 'P' in state else 0
+            self.T = convert_to(state['T'], U.K).args[0] if 'T' in state else 0
+            self.m = convert_to(state['m'], U.kg / U.s).args[0] if 'm' in state else 0
 
-            self.is_boundry_p = state['P'].args[0] if 'P' in state else False
-            self.is_boundry_T = state['T'].args[0] if 'T' in state else False
-            self.is_boundry_m = state['m'].args[0] if 'm' in state else False
+            self.is_boundry_p = convert_to(state['P'], U.pa).args[0] if 'P' in state else False
+            self.is_boundry_T = convert_to(state['T'], U.K).args[0] if 'T' in state else False
+            self.is_boundry_m = convert_to(state['m'], U.kg / U.s).args[0] if 'm' in state else False
 
     @property
     def Z(self):
@@ -156,16 +158,16 @@ class Pipe:
         self.inlet = inlet
         self.outlet = outlet
         self.num_nodes = num_nodes
-        self.length = length.args[0]
+        self.length = convert_to(length, U.m).args[0]
         self.dx = self.length / (num_nodes + 1)
-        self.D = diameter.args[0]
+        self.D = convert_to(diameter, U.m).args[0]
         self.A = np.pi * self.D ** 2 / 4
         self.teta = teta
-        self.M = molar_mass.args[0]
-        self.epsilon = epsilon and epsilon.args[0]
+        self.M = convert_to(molar_mass, U.kg / U.mol).args[0]
+        self.epsilon = epsilon and convert_to(epsilon, U.m).args[0]
         self.isotherm = isotherm
-        self.ambient_T = ambient_t and ambient_t.args[0]
-        self.U = heat_transfer_coef and heat_transfer_coef.args[0]
+        self.ambient_T = ambient_t and convert_to(ambient_t, U.K).args[0]
+        self.U = heat_transfer_coef and convert_to(heat_transfer_coef, U.W / ((U.m ** 2) * U.K)).args[0]
 
         self.nodes = [Node(self) for i in range(0, num_nodes + 2)]
         self.nodes[0] = Node(self, self.inlet)
@@ -204,19 +206,19 @@ class Pipe:
 
     def _initialize_by_boundry(self):
         if self.inlet is not None and 'P' in self.inlet:
-            p = self.inlet['P'].args[0]
+            p = convert_to(self.inlet['P'], U.pa).args[0]
         else:
-            p = self.outlet['P'].args[0]
+            p = convert_to(self.outlet['P'], U.pa).args[0]
 
         if self.inlet is not None and 'm' in self.inlet:
-            m = self.inlet['m'].args[0]
+            m = convert_to(self.inlet['m'], U.kg / U.s).args[0]
         else:
-            m = self.outlet['m'].args[0]
+            m = convert_to(self.outlet['m'], U.kg / U.s).args[0]
 
         if self.inlet is not None and 'T' in self.inlet:
-            t = self.inlet['T'].args[0]
+            t = convert_to(self.inlet['T'], U.K).args[0]
         else:
-            t = self.outlet['T'].args[0]
+            t = convert_to(self.outlet['T'], U.K).args[0]
 
         for node in self.nodes:
             node.P = p
