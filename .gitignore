@@ -10,3 +10,5 @@ __not_for_packaging*
 .cache/
 .pylintrc
 .idea/
+.vscode/
+setup.cfg
