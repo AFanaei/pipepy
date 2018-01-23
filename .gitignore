@@ -12,3 +12,4 @@ __not_for_packaging*
 .idea/
 .vscode/
 setup.cfg
+*.pyc

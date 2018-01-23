@@ -41,13 +41,13 @@ class Node:
         self.pipe = pipe
         self.f_r_old = 0.001
         if state is not None:
-            self.P = state['P'].as_two_terms()[0] if 'P' in state else 0
-            self.T = state['T'].as_two_terms()[0] if 'T' in state else 0
-            self.m = state['m'].as_two_terms()[0] if 'm' in state else 0
+            self.P = state['P'].args[0] if 'P' in state else 0
+            self.T = state['T'].args[0] if 'T' in state else 0
+            self.m = state['m'].args[0] if 'm' in state else 0
 
-            self.is_boundry_p = state['P'].as_two_terms()[0] if 'P' in state else False
-            self.is_boundry_T = state['T'].as_two_terms()[0] if 'T' in state else False
-            self.is_boundry_m = state['m'].as_two_terms()[0] if 'm' in state else False
+            self.is_boundry_p = state['P'].args[0] if 'P' in state else False
+            self.is_boundry_T = state['T'].args[0] if 'T' in state else False
+            self.is_boundry_m = state['m'].args[0] if 'm' in state else False
 
     @property
     def Z(self):
@@ -156,16 +156,16 @@ class Pipe:
         self.inlet = inlet
         self.outlet = outlet
         self.num_nodes = num_nodes
-        self.length = length.as_two_terms()[0]
+        self.length = length.args[0]
         self.dx = self.length / (num_nodes + 1)
-        self.D = diameter.as_two_terms()[0]
+        self.D = diameter.args[0]
         self.A = np.pi * self.D ** 2 / 4
         self.teta = teta
-        self.M = molar_mass.as_two_terms()[0]
-        self.epsilon = epsilon and epsilon.as_two_terms()[0]
+        self.M = molar_mass.args[0]
+        self.epsilon = epsilon and epsilon.args[0]
         self.isotherm = isotherm
-        self.ambient_T = ambient_t and ambient_t.as_two_terms()[0]
-        self.U = heat_transfer_coef and heat_transfer_coef.as_two_terms()[0]
+        self.ambient_T = ambient_t and ambient_t.args[0]
+        self.U = heat_transfer_coef and heat_transfer_coef.args[0]
 
         self.nodes = [Node(self) for i in range(0, num_nodes + 2)]
         self.nodes[0] = Node(self, self.inlet)
@@ -204,19 +204,19 @@ class Pipe:
 
     def _initialize_by_boundry(self):
         if self.inlet is not None and 'P' in self.inlet:
-            p = self.inlet['P'].as_two_terms()[0]
+            p = self.inlet['P'].args[0]
         else:
-            p = self.outlet['P'].as_two_terms()[0]
+            p = self.outlet['P'].args[0]
 
         if self.inlet is not None and 'm' in self.inlet:
-            m = self.inlet['m'].as_two_terms()[0]
+            m = self.inlet['m'].args[0]
         else:
-            m = self.outlet['m'].as_two_terms()[0]
+            m = self.outlet['m'].args[0]
 
         if self.inlet is not None and 'T' in self.inlet:
-            t = self.inlet['T'].as_two_terms()[0]
+            t = self.inlet['T'].args[0]
         else:
-            t = self.outlet['T'].as_two_terms()[0]
+            t = self.outlet['T'].args[0]
 
         for node in self.nodes:
             node.P = p
