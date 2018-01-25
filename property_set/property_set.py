@@ -1,4 +1,5 @@
-from scipy import constants, math
+from numpy import sqrt
+from scipy import constants
 
 from utils.functional import cached_property
 
@@ -41,11 +42,10 @@ class PropertySet(object):
 
     @cached_property
     def v_w(self):
-        return math.sqrt(
-            self.Z * constants.R * self.T / self.MW /
-            (1 - self.P / self.Z * self.dz_dp - self.P / (self.ro * self.c_p * self.T) * (1 + self.T / self.Z * self.dz_dt)**2)
-        )
+        value = self.Z * constants.R * self.T / self.MW / (1 - self.P / self.Z * self.dz_dp - self.P / (self.ro * self.c_p * self.T) * (1 + self.T / self.Z * self.dz_dt)**2)
+        return sqrt(value)
 
+    @cached_property
     def vis(self):
         # TODO: add viscosity from correlation.
         return 1.15 * 10**5
