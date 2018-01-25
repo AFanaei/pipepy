@@ -66,7 +66,7 @@ class PipeIsothermTest(unittest.TestCase):
 class PipeTest(unittest.TestCase):
     def setUp(self):
         # use absulute pressure.
-        self.pipe = Pipe(num_nodes=7, length=1 * U.km, teta=0, diameter=0.254 * U.m, epsilon=4.572e-05 * U.m, inlet=MaterialStream(
+        self.pipe = Pipe(num_nodes=8, length=1 * U.km, teta=0, diameter=0.254 * U.m, epsilon=4.572e-05 * U.m, inlet=MaterialStream(
             P=1761580 * U.pa,
             T=322.737 * U.K,
             m=22.2816 * U.kg / U.s,

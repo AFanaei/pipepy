@@ -5,7 +5,6 @@ notifications:
     on_failure: always
 python:
   - "2.7"
-  - "3.6"
 install:
   - sudo apt-get update
   - if [[ "$TRAVIS_PYTHON_VERSION" == "2.7" ]]; then
