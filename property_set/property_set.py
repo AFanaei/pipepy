@@ -22,12 +22,12 @@ class PropertySet(object):
         return self.z_calculator.get_z(self.P / 10 ** 5, self.T - 273.15)
 
     @cached_property
-    def dz_dp(self):
+    def dZdP(self):
         # in the given correlation p is in bar gauge and T is in centigrade but in our model every thing is in SI
         return self.z_calculator.get_z(self.P / 10 ** 5, self.T - 273.15, dp=True) / 10**5
 
     @cached_property
-    def dz_dt(self):
+    def dZdT(self):
         # in the given correlation p is in bar gauge and T is in centigrade but in our model every thing is in SI
         return self.z_calculator.get_z(self.P / 10 ** 5, self.T - 273.15, dt=True)
 
@@ -42,7 +42,7 @@ class PropertySet(object):
 
     @cached_property
     def v_w(self):
-        value = self.Z * constants.R * self.T / self.MW / (1 - self.P / self.Z * self.dz_dp - self.P / (self.ro * self.c_p * self.T) * (1 + self.T / self.Z * self.dz_dt)**2)
+        value = self.Z * constants.R * self.T / self.MW / (1 - self.P / self.Z * self.dZdP - self.P / (self.ro * self.c_p * self.T) * (1 + self.T / self.Z * self.dZdT)**2)
         return sqrt(value)
 
     @cached_property

@@ -4,227 +4,110 @@ from scipy import constants, optimize, math
 from sympy.physics import units as U
 from sympy.physics.units import convert_to
 
-from property_set.comp_factor import CompFactorInterpolator
+from pde.domain import Domain, DomainVar
+from property_set.property_set import PropertySet
+from utils.functional import cached_property
 
 
 class InputError(Exception):
     pass
 
 
-class Node:
-    def __init__(self, pipe=None, state=None):
-        self.Zcalculator = CompFactorInterpolator()
-        self.P = 0
-        self.T = 0
-        self.m = 0
+class PipePropertyCalculator(object):
+    def __init__(self, ps, pipe):
+        self.ps = ps
         self.pipe = pipe
-        self.f_r_old = 0.001
-        if state is not None:
-            self.P = convert_to(state['P'], U.pa).args[0] if 'P' in state else 0
-            self.T = convert_to(state['T'], U.K).args[0] if 'T' in state else 0
-            self.m = convert_to(state['m'], U.kg / U.s).args[0] if 'm' in state else 0
 
-            self.is_boundry_p = convert_to(state['P'], U.pa).args[0] if 'P' in state else False
-            self.is_boundry_T = convert_to(state['T'], U.K).args[0] if 'T' in state else False
-            self.is_boundry_m = convert_to(state['m'], U.kg / U.s).args[0] if 'm' in state else False
+    def invalidate_cache(self):
+        cached_property.invalidate_cache(self)    
 
-    @property
-    def Z(self):
-        # in the given correlation p is in bar gauge and T is in centigrade but in our model every thing is in SI
-        return self.Zcalculator.get_z(self.P / 10 ** 5, self.T - 273.15)
-
-    @property
-    def dz_dp(self):
-        # in the given correlation p is in bar gauge and T is in centigrade but in our model every thing is in SI
-        return self.Zcalculator.get_z(self.P / 10 ** 5, self.T - 273.15, dp=True) / 10**5
-
-    @property
-    def dz_dt(self):
-        # in the given correlation p is in bar gauge and T is in centigrade but in our model every thing is in SI
-        return self.Zcalculator.get_z(self.P / 10 ** 5, self.T - 273.15, dt=True)
-
-    @property
-    def v_w(self):
-        return math.sqrt(
-            self.Z * constants.R * self.T / self.pipe.M /
-            (1 - self.P / self.Z * self.dz_dp - self.P / (self.ro * self.c_p * self.T) * (1 + self.T / self.Z * self.dz_dt)**2)
-        )
-
-    @property
-    def c_p(self):
-        # TODO: add specific heat from correlation.
-        return 2314
-
-    @property
+    @cached_property
     def omega(self):
-        return self.pipe.U * (math.pi * self.pipe.D) * (self.pipe.ambient_T - self.T)
+        return self.pipe.U * (math.pi * self.pipe.D) * (self.pipe.ambient_T - self.pipe.domain.T)
 
-    @property
+    @cached_property
     def tav_w(self):
-        return self.f_r * self.ro * self.v * abs(self.v) / 8
+        return self.f_r * self.ps.ro * self.v * abs(self.v) / 8
 
-    @property
+    @cached_property
     def v(self):
-        return self.m / (self.ro * self.pipe.A)
+        return self.pipe.domain.m / (self.ps.ro * self.pipe.A)
 
-    @property
-    def ro(self):
-        return self.P * self.pipe.M / (self.Z * constants.R * self.T)
-
-    @property
+    @cached_property
     def f_r(self):
-        def func(x):
-            t = math.log10(self.pipe.epsilon / (3.7 * self.pipe.D) + 2.51 / (self.Re * math.sqrt(x)))
-            return 1 / math.sqrt(x) + 2 * t
-        self.f_r_old = optimize.fsolve(func, np.array(self.f_r_old))
-        return float(self.f_r_old)
+        return 0.01356143
+        # def func(x):
+        #     t = math.log10(self.pipe.epsilon / (3.7 * self.pipe.D) + 2.51 / (self.Re * math.sqrt(x)))
+        #     return 1 / math.sqrt(x) + 2 * t
+        # self.f_r_old = optimize.fsolve(func, np.array(self.f_r_old))
+        # return float(self.f_r_old)
 
-    @property
+    @cached_property
     def Re(self):
         # TODO: add viscosity from correlation.
-        return self.ro * self.v * self.pipe.D / 1.15 * 10**5
-
-    def num_equations(self):
-        if self.pipe.isotherm:
-            return 2
-        return 3
-
-    def equations(self, pre_node, next_node):
-        dx = 2 * self.pipe.dx
-        res = [0, 0]
-        if pre_node is None:
-            dx = self.pipe.dx
-            pre_node = self
-
-        if next_node is None:
-            dx = self.pipe.dx
-            next_node = self
-
-        # equation for dp/dt
-        if hasattr(self, 'is_boundry_p'):
-            res[0] = self.is_boundry_p - self.P
-        else:
-            res[0] = -self.Z * constants.R * self.T / self.pipe.A / self.pipe.M * (next_node.m - pre_node.m) / dx
-        # equation for dm/dt
-        if hasattr(self, 'is_boundry_m'):
-            res[1] = self.is_boundry_m - self.m
-        else:
-            res[1] = \
-                - (next_node.m**2 * next_node.Z * constants.R * next_node.T / next_node.P / self.pipe.A / self.pipe.M) / dx \
-                + (pre_node.m**2 * pre_node.Z * constants.R * pre_node.T / pre_node.P / self.pipe.A / self.pipe.M) / dx \
-                - self.pipe.A * (next_node.P - pre_node.P) / dx \
-                - self.f_r * self.Z * constants.R * self.T / (2 * self.pipe.M * self.pipe.D * self.pipe.A) * self.m * abs(self.m) / self.P \
-                - self.pipe.M * self.pipe.A * self.P * constants.g * np.sin(self.pipe.teta) / (self.Z * constants.R * self.T)
-        # equation for dT/dt
-        if self.pipe.isotherm:
-            return res
-
-        if hasattr(self, 'is_boundry_T'):
-            res.append(self.is_boundry_T - self.T)
-        else:
-            res.append(+ self.v * (next_node.T - pre_node.T) / dx
-                       + self.v_w**2 / self.c_p * (1 + self.T / self.Z * self.dz_dt) * (next_node.v - pre_node.v) / dx
-                       - self.v_w**2 / (self.c_p * self.P) * (1 - self.P / self.Z * self.dz_dp)
-                       * (self.omega + self.tav_w * math.pi * self.pipe.D * self.v) / self.pipe.A)
-        return res
+        return self.ps.ro * self.v * self.pipe.D / self.ps.vis
 
 
-class Pipe:
-    def __init__(self, inlet=None, outlet=None, num_nodes=None, teta=None, length=None, diameter=None, molar_mass=None,
-                 epsilon=None, ambient_t=None, isotherm=True, heat_transfer_coef=None, ):
-        self.inlet = inlet
-        self.outlet = outlet
-        self.num_nodes = num_nodes
-        self.length = convert_to(length, U.m).args[0]
-        self.dx = self.length / (num_nodes + 1)
-        self.D = convert_to(diameter, U.m).args[0]
+class Pipe(object):
+    def __init__(self, inlet=None, outlet=None, num_nodes=None, teta=0, length=None, diameter=None,
+                 epsilon=0, ambient_t=None, isotherm=True, heat_transfer_coef=0):
+        self.inlet_stream = inlet
+        self.outlet_stream = outlet
+        self.D = np.array(convert_to(diameter, U.m).args[0], dtype=np.float32)
         self.A = np.pi * self.D ** 2 / 4
         self.teta = teta
-        self.M = convert_to(molar_mass, U.kg / U.mol).args[0]
-        self.epsilon = epsilon and convert_to(epsilon, U.m).args[0]
+        self.epsilon = epsilon and np.array(convert_to(epsilon, U.m).args[0], dtype=np.float32)
         self.isotherm = isotherm
-        self.ambient_T = ambient_t and convert_to(ambient_t, U.K).args[0]
-        self.U = heat_transfer_coef and convert_to(heat_transfer_coef, U.W / ((U.m ** 2) * U.K)).args[0]
+        self.ambient_T = ambient_t and np.array(convert_to(ambient_t, U.K).args[0], dtype=np.float32)
+        self.U = heat_transfer_coef and np.array(convert_to(heat_transfer_coef, U.W / ((U.m ** 2) * U.K)).args[0], dtype=np.float32)
 
-        self.nodes = [Node(self) for i in range(0, num_nodes + 2)]
-        self.nodes[0] = Node(self, self.inlet)
-        self.nodes[-1] = Node(self, self.outlet)
+        self.domain = Domain(np.array(convert_to(length, U.m).args[0], dtype=np.float32), num_nodes + 2)
+        # define domain var and their boundry conditions
+        DomainVar('P', self.domain, (0, self.inlet_stream.P))
+        DomainVar('m', self.domain, (0, self.inlet_stream.m))
+        DomainVar('T', self.domain, (0, self.inlet_stream.T))
 
-        self.is_feasible()
+        # intial conditions
+        self.domain.P[:] = self.inlet_stream.P
+        self.domain.m[:] = self.inlet_stream.m
+        self.domain.T[:] = self.inlet_stream.T
 
-    def is_feasible(self):
-        if not self.isotherm and (self.ambient_T is None or self.U is None):
-            raise InputError("pipe is not isotherm and ambient T or U does not specified.")
-
-        number_equations = (self.num_nodes + 1) * self.nodes[0].num_equations()
-        number_vars = self.num_nodes * self.nodes[0].num_equations()
-        if self.inlet is not None:
-            number_vars += 0 if self.inlet['P'] is None else 1
-            number_vars += 0 if self.inlet['m'] is None else 1
-            number_vars += 1 if self.inlet['T'] is not None and not self.isotherm else 0
-        if self.outlet is not None:
-            number_vars += 0 if self.outlet['P'] is None else 1
-            number_vars += 0 if self.outlet['m'] is None else 1
-            number_vars += 1 if self.outlet['T'] is not None and not self.isotherm else 0
-
-        if number_vars != number_equations:
-            raise InputError("number of equations {} != variables {}.".format(number_equations, number_vars))
+        self.ps = PropertySet()
+        self.ps.P = self.domain.P
+        self.ps.T = self.domain.T
+        self.ps.MW = inlet.MW
+        self.pc = PipePropertyCalculator(self.ps, self)
 
     def solve_steady_state(self):
-        p, t, m = self._initialize_by_boundry()
-        x = [float(p)] * (self.num_nodes + 2) + [float(m)] * (self.num_nodes + 2)
-        if not self.isotherm:
-            x += [float(t)] * (self.num_nodes + 2)
-        x = optimize.fsolve(self._system_equations, x)
+        return optimize.fsolve(self._system_equations, self.domain.initialize_vars())
 
-        # for i, (p, m) in enumerate(zip(x[:len(x) // 2], x[len(x) // 2:])):
-        #     self.nodes[i].P = p
-        #     self.nodes[i].m = m
-
-    def _initialize_by_boundry(self):
-        if self.inlet is not None and 'P' in self.inlet:
-            p = convert_to(self.inlet['P'], U.pa).args[0]
-        else:
-            p = convert_to(self.outlet['P'], U.pa).args[0]
-
-        if self.inlet is not None and 'm' in self.inlet:
-            m = convert_to(self.inlet['m'], U.kg / U.s).args[0]
-        else:
-            m = convert_to(self.outlet['m'], U.kg / U.s).args[0]
-
-        if self.inlet is not None and 'T' in self.inlet:
-            t = convert_to(self.inlet['T'], U.K).args[0]
-        else:
-            t = convert_to(self.outlet['T'], U.K).args[0]
-
-        for node in self.nodes:
-            node.P = p
-            node.m = m
-            node.T = t
-
-        return p, t, m
+    def invalidate_cache(self):
+        self.domain.invalidate_cache()
+        self.ps.invalidate_cache()
+        self.pc.invalidate_cache()
 
     def _system_equations(self, x):
-        y = []
-        len_x = len(x)
-        d = len_x // len(self.nodes)
-        l = [x[i * len_x // d:(i + 1) * len_x // d] for i in range(d)]
-        for i, tup in enumerate(zip(*l)):
-            self.nodes[i].P = tup[0]
-            self.nodes[i].m = tup[1]
-            try:
-                self.nodes[i].T = tup[2]
-            except IndexError:
-                pass
+        self.domain.import_array_to_vars(x)
+        self.ps.P = self.domain.P
+        self.ps.T = self.domain.T
+        self.invalidate_cache()
 
-        for i, _ in enumerate(self.nodes):
-            try:
-                pre_node = self.nodes[i - 1]
-            except IndexError:
-                pre_node = None
-            try:
-                next_node = self.nodes[i + 1]
-            except IndexError:
-                next_node = None
-            y.extend(self.nodes[i].equations(pre_node, next_node))
-        return y
+        expr = (self.domain.m**2 * self.ps.Z * self.domain.T / self.domain.P / self.ps.MW) * (constants.R / self.A)
+        self.domain.dPdt = -(self.ps.Z * self.domain.T / self.ps.MW) * (constants.R / self.A) * self.domain.dmdx
+        self.domain.dmdt = \
+            - np.gradient(expr) / self.domain.dx \
+            - self.A * self.domain.dPdx \
+            - self.pc.f_r * self.ps.Z * constants.R * self.domain.T / (2 * self.ps.MW * self.D * self.A) * self.domain.m * abs(self.domain.m) / self.domain.P \
+            - self.ps.MW * self.A * self.domain.P * constants.g * np.sin(self.teta) / (self.ps.Z * constants.R * self.domain.T)
+
+        # equation for dT/dt
+        if self.isotherm:
+            return self.domain.export_vars_to_array()
+
+        self.domain.dTdt = \
+            + self.pc.v * self.domain.dTdx \
+            + self.ps.v_w**2 / self.ps.c_p * (1 + self.domain.T / self.ps.Z * self.ps.dZdT) * np.gradient(self.pc.v) / self.domain.dx \
+            - self.ps.v_w**2 / (self.ps.c_p * self.domain.P) * (1 - self.domain.P / self.ps.Z * self.ps.dZdP) \
+            * (self.pc.omega + self.pc.tav_w * math.pi * self.D * self.pc.v) / self.A
+
+        return self.domain.export_vars_to_array()
