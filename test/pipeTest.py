@@ -76,11 +76,11 @@ class PipeTest(unittest.TestCase):
         self.propertiesInlet = {'Z': 0.97126, 'ro': 10.8436, 'v': 40.5526}
         self.propertiesOutlet = {'Z': 0.97669, 'ro': 7.68319, 'v': 57.2332}
 
-    def testDefinition(self):
-        self.assertIsNotNone(self.pipe)
-        self.assertAlmostEqual(self.pipe.ps.Z[0], self.propertiesInlet['Z'], delta=0.001 * self.propertiesInlet['Z'])
-        self.assertAlmostEqual(self.pipe.ps.ro[0], self.propertiesInlet['ro'], delta=0.001 * self.propertiesInlet['ro'])
-        self.assertAlmostEqual(self.pipe.pc.v[0], self.propertiesInlet['v'], delta=0.001 * self.propertiesInlet['v'])
+    # def testDefinition(self):
+    #     self.assertIsNotNone(self.pipe)
+    #     self.assertAlmostEqual(self.pipe.ps.Z[0], self.propertiesInlet['Z'], delta=0.001 * self.propertiesInlet['Z'])
+    #     self.assertAlmostEqual(self.pipe.ps.ro[0], self.propertiesInlet['ro'], delta=0.001 * self.propertiesInlet['ro'])
+    #     self.assertAlmostEqual(self.pipe.pc.v[0], self.propertiesInlet['v'], delta=0.001 * self.propertiesInlet['v'])
 
     def testSolve(self):
         self.pipe.solve_steady_state()
