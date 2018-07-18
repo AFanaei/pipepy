@@ -17,6 +17,7 @@ class PipePropertyCalculator(object):
     def __init__(self, ps, pipe):
         self.ps = ps
         self.pipe = pipe
+        self.f_r_old = 0.0125534
 
     def invalidate_cache(self):
         cached_property.invalidate_cache(self)    
@@ -35,12 +36,12 @@ class PipePropertyCalculator(object):
 
     @cached_property
     def f_r(self):
-        return 0.01356143
-        # def func(x):
-        #     t = math.log10(self.pipe.epsilon / (3.7 * self.pipe.D) + 2.51 / (self.Re * math.sqrt(x)))
-        #     return 1 / math.sqrt(x) + 2 * t
-        # self.f_r_old = optimize.fsolve(func, np.array(self.f_r_old))
-        # return float(self.f_r_old)
+        # return self.f_r_old
+        def func(x):
+            t = math.log10(self.pipe.epsilon / (3.7 * self.pipe.D) + 2.51 / (max(self.Re) * math.sqrt(x)))
+            return 1 / math.sqrt(x) + 2 * t
+        self.f_r_old = optimize.fsolve(func, np.array(self.f_r_old))
+        return float(self.f_r_old)
 
     @cached_property
     def Re(self):
