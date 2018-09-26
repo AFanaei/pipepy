@@ -48,4 +48,5 @@ class PropertySet(object):
     @cached_property
     def vis(self):
         # TODO: add viscosity from correlation.
-        return 1.15 * 10**5
+        # return 1.13144 * 10**-5
+        return 1.1154 * 10**-5
