@@ -1,8 +1,9 @@
-# importing the constans and numpy lib for calculations 
+# importing the constans , numpy and scipy lib for calculations 
 import tables_B1
 import tables_B2
 import tables_B3
 import numpy as np
+form sicpy.optimize import fsolve
 # This programme is for compression factor calculations at "EN ISO 12213-2:2005" Method.
 
 print('Please Enter the absolute Temperature [K], absolute pressure P [MPa] and the mole fraction of each component "x" as a list')
@@ -55,4 +56,21 @@ F_cal = sum(x ** 2 * F)
 
 Cn_star = a * (G_cal_tot + 1 -g) ** g * (Q_cal ** 2 + 1 - q) ** q * (F_cal + 1 - f) ** f * U_cal_tot ** u * T ** -u 
 
-# Step III : 
+# Step III : Calculation of mixture size parameter K and molar density Rho_m
+
+K_cal_term1 = (sum(x * K ** (2.5) )) ** 2
+temp0 = 0 ; K_cal_term2 = 0
+for i in range(N-1):
+    for j in range(i+1 , N):
+        temp0 += x[j] * (Kij[i,j] ** 5 - 1) * (K[j]) ** 2.5
+        temp1[i] = temp0
+    K_cal_term2 +=  (x[i]) * (K[i]) ** (2.5) * temp1[i])
+    
+K_cal_tot = (K_cal_term1 + 2 * K_cal_term2) ** (.2)   # Note that index of each number is one less than the real number
+
+Rho_m = fsolve(Rho_m * R * T * (1 + B * Rho_m - K**3 * Rho_m * sum(Cn_star[:17]) + sum(Cn_star*(b - c*k*(K**3*Rho_m)**k)*(K**3*Rho_m)**b*exp(-c*(K**3*Rho_m)**k)))) = P , P/(R*T))
+
+# Step IV : The Last is Determing the Z - factor
+Z = P/(Rho_m * R * T)
+Mw = round(sum(x * M))
+Rho = Mw * Rho_m
