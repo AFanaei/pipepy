@@ -1,4 +1,4 @@
-from numpy import array
+from numpy import array , zeros
 # These are Characterization parameters for Calculation of state compression factor/Composition analysis
 # Identification number for component list as a Dic type
 IdNum = {0:'Methane' , 1:'Nitrogen' , 2:'Carbon dioxide' , 3:'Ethane' , 4:'Propane' , 5:'Water' , 6:'Hydrogen sulfide' , 7:'Hydrogen',
@@ -17,10 +17,10 @@ K = array([.4619255, .4479153, .4557489, .5279209, .5837490, .3825868, .4618263,
 G = array([0.0, .027815, .189065, .079300, .141239, .332500, .088500, .034369, .038953, .021000, .256692, .281835, .332267, .366911, .289731,
      .337542, .383381, .427354, .469659, 0.0, 0.0 ])
 # Quadru pole parameter
-Q = 21 * [0.0] ; Q[2] = .690000 ; Q[5] = 1.067750 ; Q[6] = .633276 ; Q = array(Q) 
+Q = zeros(21) ; Q[2] = .690000 ; Q[5] = 1.067750 ; Q[6] = .633276  
 # High_temp.parameter
-F = 21 * [0.0] ; F[7] = 1.0 ; F = array(F)
+F = zeros(21) ; F[7] = 1.0 
 # Dipole parameter
-S = 21 * [0.0] ; S[5] = 1.582200 ; S[6] = .390000 ; S = array(S)
+S = zeros(21) ; S[5] = 1.582200 ; S[6] = .390000 
 # Association parameter
-W = 21 * [0.0] ; W[5] = 1.0 ; W = array(W)
+W = zeros(21) ; W[5] = 1.0
