@@ -15,7 +15,7 @@ class Component(object):
 
         with open(address) as fp:
             data = json.load(fp)
-            component_data = filter(lambda x: x['name'] == name, data)[0]
+            component_data = [x for x in data if x['name'] == name][0]
 
         return Component(**component_data)
 
